@@ -26,8 +26,11 @@
   #goal .abandon:hover { color: var(--ink); border-color: var(--line); background: var(--panel); }
   #goal .big { font-size: 1.15rem; }
 
-  .cols { display: grid; grid-template-columns: 1fr; gap: 1.2rem; }
-  @media (min-width: 52rem) { .cols { grid-template-columns: 1fr 22rem; align-items: start; } }
+  /* minmax(0, …), not a bare 1fr: a grid track otherwise refuses to shrink below its widest content
+     (the spellbook's <pre>, a long formula), and the whole page then scrolls sideways on a phone. */
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.2rem; }
+  .cols > div { min-width: 0; }
+  @media (min-width: 52rem) { .cols { grid-template-columns: minmax(0, 1fr) 22rem; align-items: start; } }
   h2.sec { font-size: .82rem; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 0 0 .5rem; }
 
   #bench { display: flex; flex-wrap: wrap; gap: .5rem; min-height: 2.4rem; }
@@ -186,6 +189,65 @@
     color: var(--ink); background: color-mix(in srgb, #c08a2e 22%, transparent); border: 1px solid #c08a2e; border-radius: 6px; }
   #goal .matched { color: var(--ok, #2c9c4a); font-weight: 600; }
   #goal .prov strong { font-weight: 600; color: var(--muted); }
+  /* ---- Phones and touchscreens ----------------------------------------------------------------
+     Two separate concerns, so two separate queries. NARROW screens need the layout to fit the
+     viewport with nothing pushing the page sideways; COARSE pointers (fingers, on a phone or a
+     tablet of any width) need targets of about 44px, the size both Apple and WCAG 2.5.5 ask for. */
+  #exsel { max-width: 100%; }
+  .toolbar > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: 100%; }
+  #formula-in, #term-in { min-width: 0; max-width: 100%; }
+  #goal, .recipe, .deduction, .potion, .gem, .fchip, .tchip, #ach, .dlg-box { overflow-wrap: anywhere; }
+  .potion, .gem, .fchip, .tchip { max-width: 100%; text-align: left; }
+  #mapview { height: min(340px, 55vh); }
+  #ctxmenu { max-width: calc(100vw - 16px); }
+  #dlg-btns { flex-wrap: wrap; }
+  /* a long-press opens the chip's menu (see the script), so it must not also select text or raise
+     the browser's own callout */
+  .potion, .gem, .fchip, .tchip { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  button, select, summary, label, .potion, .gem, .fchip, .tchip { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+  @media (max-width: 40rem) {
+    .wrap { padding: 1rem .9rem 2.5rem; }
+    header { margin-bottom: 1rem; }
+    h1 { font-size: 1.45rem; }
+    .toolbar > div { width: 100%; }
+    #exsel { flex: 1 1 100%; min-width: 0; }
+    #nextunsolved { flex: 1 1 auto; }
+    #undo, #reset { flex: 1 1 0; }
+    #goal { padding: .65rem .75rem; }
+    .spellhead { align-items: flex-start; }
+    #spellbook { padding: .7rem .75rem; }
+    .mapbar .dev { margin-left: 0; }
+    .dlg-box { width: 100%; }
+    #dlg-btns button { flex: 1 1 auto; }
+    /* text inputs below 16px make iOS Safari zoom the page on focus, and it does not zoom back */
+    #formula-in, #term-in, select { font-size: 16px; }
+  }
+
+  @media (pointer: coarse), (max-width: 40rem) {
+    .toolbar button, .toolbar select, select, .selbar button, .mapbar button, .seg button, .spellctl .exp,
+    #goal .hintbtn, #goal .gonext, #dlg-btns button, #ctxmenu button, #term-add, #formula-add {
+      min-height: 44px; min-width: 44px; padding-top: .45rem; padding-bottom: .45rem; }
+    #formula-in, #term-in { min-height: 44px; }
+    .potion, .gem, .fchip, .tchip { min-height: 44px; padding-top: .45rem; padding-bottom: .45rem; }
+    .gem { padding-left: .7rem; padding-right: .7rem; }
+    .deduction { min-height: 44px; padding: .6rem .7rem; }
+    .sortchip { min-height: 36px; padding: .3rem .7rem; margin: .15rem 0; }
+    #goal .abandon { padding: .35rem .6rem; border-color: var(--line); }
+    #ctxmenu { min-width: 10rem; }
+    #ctxmenu button { padding-left: 1rem; padding-right: 1rem; }
+    #bench, #formula-shelf, #term-shelf, #benchvars { gap: .6rem; }
+    /* the checkbox options: the whole label is the target, and the box itself is big enough to see */
+    .toolbar label:has(input), .selbar label, .mapbar label { min-height: 44px; padding: 0 .15rem; }
+    .toolbar input[type="checkbox"], .selbar input[type="checkbox"], .mapbar input[type="checkbox"] {
+      width: 1.25rem; height: 1.25rem; margin: 0 .2rem 0 0; flex: none; accent-color: var(--accent); }
+    .toolbar, .selbar { gap: 4px 14px; }
+    details#mapwrap > summary, details#achwrap > summary, details.note > summary { padding: .7rem 0; }
+    details#mapwrap, details#achwrap { margin: 0; }
+    details.note { margin-top: .6rem; }
+    .back { margin-bottom: .6rem; }
+    .back a { display: inline-block; padding: .65rem .5rem .65rem 0; }
+  }
 </style>
 </head>
 <body>
@@ -1469,12 +1531,48 @@
   function showCtx(x, y, items) {
     el.ctxmenu.innerHTML = items.map(function (it, i) { return '<button data-ci="' + i + '">' + esc(it.label) + '</button>'; }).join('');
     el.ctxmenu.style.left = x + 'px'; el.ctxmenu.style.top = y + 'px'; el.ctxmenu.hidden = false;
+    // keep it on screen: a press near the right or bottom edge of a phone would otherwise open it half off
+    var cr = el.ctxmenu.getBoundingClientRect(), vw = document.documentElement.clientWidth, vh = window.innerHeight;
+    el.ctxmenu.style.left = Math.max(8, Math.min(x, vw - cr.width - 8)) + 'px';
+    el.ctxmenu.style.top = Math.max(8, Math.min(y, vh - cr.height - 8)) + 'px';
     Array.prototype.forEach.call(el.ctxmenu.querySelectorAll('button'), function (btn) {
       btn.addEventListener('click', function (ev) { ev.stopPropagation(); el.ctxmenu.hidden = true; items[+btn.getAttribute('data-ci')].fn(); });
     });
   }
   document.addEventListener('click', function () { el.ctxmenu.hidden = true; });
   document.addEventListener('contextmenu', function () { el.ctxmenu.hidden = true; });
+  // Touchscreens have no right-click, and iOS Safari never fires `contextmenu` for a long-press, so the
+  // chip menus (rename, delete, introduce…) were out of reach there. A press held still for half a second
+  // is turned into the same `contextmenu` event the chips already listen for; where the browser raises
+  // its own (Android), that one wins and the timer is dropped. The click that follows lifting the finger
+  // is swallowed wherever it lands: the menu has just opened under that finger, so the click would
+  // otherwise toggle the chip, close the menu, or — worst — pick whichever item happened to be there.
+  // Only a press that is still in progress arms this, so a mouse's right-click is left exactly as it was.
+  (function () {
+    var timer = null, sx = 0, sy = 0, swallow = false, touching = false;
+    function cancel() { if (timer) { clearTimeout(timer); timer = null; } }
+    document.addEventListener('touchstart', function (ev) {
+      cancel(); swallow = false; touching = true;
+      var chip = ev.touches.length === 1 && ev.target.closest && ev.target.closest('.potion, .fchip, .tchip');
+      if (!chip) return;
+      sx = ev.touches[0].clientX; sy = ev.touches[0].clientY;
+      timer = setTimeout(function () {
+        timer = null; swallow = true;
+        chip.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: sx, clientY: sy }));
+      }, 550);
+    }, { passive: true });
+    document.addEventListener('touchmove', function (ev) {
+      var t = ev.touches[0]; if (timer && t && Math.abs(t.clientX - sx) + Math.abs(t.clientY - sy) > 10) cancel();
+    }, { passive: true });
+    function lift() { cancel(); touching = false; }
+    document.addEventListener('touchend', lift, { passive: true });
+    document.addEventListener('touchcancel', lift, { passive: true });
+    document.addEventListener('contextmenu', function (ev) { if (ev.isTrusted && touching) { cancel(); swallow = true; } }, true);
+    document.addEventListener('click', function (ev) {
+      if (!swallow) return; swallow = false;
+      ev.stopPropagation(); ev.preventDefault();
+    }, true);
+  })();
   function renamePotion(name) {
     var nn = window.prompt('Rename ' + name + ' to:', name);
     if (nn == null) return; nn = nn.trim();
